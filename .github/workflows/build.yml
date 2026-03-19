@@ -1,0 +1,64 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies (canvas)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libcairo2-dev \
+            libpango1.0-dev \
+            libjpeg-dev \
+            libgif-dev
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke test — check snapshot endpoint
+        run: |
+          NODE_ENV=production node dist/index.cjs &
+          SERVER_PID=$!
+          sleep 3
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/snapshot/cam-01)
+          echo "Snapshot cam-01 HTTP status: $STATUS"
+          kill $SERVER_PID
+          [ "$STATUS" = "200" ] || (echo "Expected 200, got $STATUS" && exit 1)
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t rtsp-simulator:test .
+
+      - name: Smoke test Docker image
+        run: |
+          docker run -d -p 5000:5000 --name rtsp-test rtsp-simulator:test
+          sleep 5
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/snapshot/cam-01)
+          echo "Docker snapshot HTTP status: $STATUS"
+          docker stop rtsp-test
+          [ "$STATUS" = "200" ] || (echo "Docker smoke test failed: $STATUS" && exit 1)

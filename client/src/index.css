@@ -1,0 +1,114 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Nexus dark-first palette — surveillance/security theme */
+  --background: 222 20% 7%;
+  --foreground: 210 20% 90%;
+  --card: 222 18% 10%;
+  --card-foreground: 210 20% 90%;
+  --popover: 222 18% 10%;
+  --popover-foreground: 210 20% 90%;
+  --primary: 142 70% 45%;
+  --primary-foreground: 0 0% 0%;
+  --secondary: 222 15% 16%;
+  --secondary-foreground: 210 20% 80%;
+  --muted: 222 15% 14%;
+  --muted-foreground: 210 10% 55%;
+  --accent: 142 60% 35%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 222 15% 18%;
+  --input: 222 15% 16%;
+  --ring: 142 70% 45%;
+  --radius: 0.5rem;
+
+  /* Fault colors */
+  --fault-freeze: 200 80% 60%;
+  --fault-green: 120 100% 50%;
+  --fault-noise: 40 100% 60%;
+  --fault-black: 0 0% 30%;
+  --fault-pixelate: 280 70% 65%;
+  --fault-disconnect: 0 80% 55%;
+  --fault-normal: 142 70% 45%;
+}
+
+.dark {
+  --background: 222 20% 7%;
+  --foreground: 210 20% 90%;
+  --card: 222 18% 10%;
+  --card-foreground: 210 20% 90%;
+  --popover: 222 18% 10%;
+  --popover-foreground: 210 20% 90%;
+  --primary: 142 70% 45%;
+  --primary-foreground: 0 0% 0%;
+  --secondary: 222 15% 16%;
+  --secondary-foreground: 210 20% 80%;
+  --muted: 222 15% 14%;
+  --muted-foreground: 210 10% 55%;
+  --accent: 142 60% 35%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 222 15% 18%;
+  --input: 222 15% 16%;
+  --ring: 142 70% 45%;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  min-height: 100vh;
+}
+
+code, .mono {
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+/* Scanline overlay on camera feeds */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.08) 2px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Camera feed status ring */
+.cam-online { border-color: hsl(142 70% 45%); }
+.cam-freeze  { border-color: hsl(200 80% 60%); }
+.cam-fault   { border-color: hsl(0 80% 55%); }
+.cam-offline { border-color: hsl(0 0% 30%); }
+
+/* Pulsing REC dot */
+@keyframes rec-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.rec-dot { animation: rec-pulse 1.2s ease-in-out infinite; }
+
+/* Fault badge flash */
+@keyframes fault-flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.fault-active { animation: fault-flash 0.8s ease infinite; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: hsl(var(--background)); }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
