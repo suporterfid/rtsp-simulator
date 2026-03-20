@@ -143,5 +143,98 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ====== Digifort API Endpoints ======
+
+  // GET /Interface/Cameras/GetStatus?ResponseFormat=JSON
+  // Returns all cameras with Digifort-compatible schema
+  app.get("/Interface/Cameras/GetStatus", async (_req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+
+    const responseFormat = _req.query.ResponseFormat as string | string[] | undefined;
+    if (responseFormat && (typeof responseFormat !== 'string' || responseFormat !== "JSON")) {
+      return res.status(400).json({ error: "ResponseFormat not supported" });
+    }
+
+    try {
+      const cameras = await storage.getCameras();
+      const stats = await storage.getStats();
+
+      // Build a map of stats by cameraId for efficient lookup
+      const statsMap = new Map(stats.map(s => [s.cameraId, s]));
+
+      // Transform cameras to Digifort format
+      const cameraList = cameras.map(cam => {
+        const stat = statsMap.get(cam.id);
+        return {
+          Name: cam.name,
+          RecordingFPS: (cam.enabled && cam.faultMode !== "disconnect") ? cam.fps : 0,
+          UsedDiskSpace: stat?.bytesSent ?? 0,
+          ConfiguredToRecord: cam.enabled,
+        };
+      });
+
+      return res.json({
+        Response: {
+          Data: {
+            Cameras: cameraList,
+          },
+        },
+      });
+    } catch (err) {
+      console.error("GetStatus error:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // GET /Interface/Cameras/GetSnapshot?Camera={cameraName}&ResponseFormat=JSON
+  // Returns binary JPEG snapshot for a specific camera (by name, case-sensitive)
+  app.get("/Interface/Cameras/GetSnapshot", async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+
+    const cameraNameParam = req.query.Camera as string | string[] | undefined;
+
+    // Validate required parameter
+    if (!cameraNameParam || typeof cameraNameParam !== 'string') {
+      return res.status(400).json({ error: "Camera parameter is required" });
+    }
+
+    const cameraName = cameraNameParam as string;
+
+    try {
+      // Look up camera by name (case-sensitive, matching Digifort behavior)
+      const cameras = await storage.getCameras();
+      const cam = cameras.find(c => c.name === cameraName);
+
+      if (!cam) {
+        return res.status(404).json({ error: `Camera '${cameraName}' not found` });
+      }
+
+      // Check if camera is online
+      if (!cam.enabled || cam.faultMode === "disconnect") {
+        return res.status(503).json({
+          error: `Camera '${cameraName}' is offline or disconnected`,
+        });
+      }
+
+      // Generate frame using existing frame generator
+      const frame = await generateFrame(cam);
+
+      if (!frame) {
+        // Disconnect fault returned null
+        return res.status(503).json({
+          error: `Camera '${cameraName}' is offline or disconnected`,
+        });
+      }
+
+      // Return JPEG binary
+      res.set("Content-Type", "image/jpeg");
+      res.set("Cache-Control", "no-cache");
+      return res.send(frame);
+    } catch (err) {
+      console.error(`GetSnapshot error for camera '${cameraName}':`, err);
+      return res.status(500).json({ error: "Frame generation error" });
+    }
+  });
+
   return httpServer;
 }
