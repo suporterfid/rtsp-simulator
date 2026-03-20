@@ -5,3 +5,6 @@ dist/
 *.log
 .DS_Store
 Thumbs.db
+docs/specs/digifort/DIGIFORT_API_SPEC.md
+docs/specs/digifort/FIELD_MAPPING_DIGIFORT_ALERTAHUB.md
+docs/specs/digifort/SPEC-DIGIFORT_GUIDE.md
