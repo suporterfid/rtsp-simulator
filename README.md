@@ -1,28 +1,29 @@
 # RTSP Simulator — NVR/VMS Test Platform
 
-Servidor de streams de câmeras simuladas com falhas configuráveis (congelamento, tela verde, ruído, tela preta, pixelado, desconexão) para testes de NVR/VMS.
+A lightweight HTTP/MJPEG camera simulator with configurable faults (freeze, green screen, noise, black screen, pixelation, disconnection) for NVR/VMS integration testing.
 
-## Visão Geral
+## Overview
 
-Este projeto provê **8 câmeras virtuais** via HTTP/MJPEG com cenas animadas e modos de falha injetáveis, útil para:
+This project provides **8 virtual cameras** via HTTP/MJPEG with animated scenes and injectable failure modes, useful for:
 
-- Testar detecção de perda de sinal em sistemas VMS (Milestone, Genetec, Hikvision IVMS, etc.)
-- Validar comportamento de NVRs como Blue Iris, Frigate, Shinobi sob condições adversas
-- Desenvolvimento e CI de integrações com câmeras IP sem hardware físico
+- Testing signal-loss detection in VMS systems (Milestone, Genetec, Hikvision IVMS, etc.)
+- Validating NVR behavior (Blue Iris, Frigate, Shinobi) under adverse conditions
+- Development and CI of camera integrations without physical hardware
+- Testing Digifort API integrations with AlertaHub Vision/Core and other platforms
 
-## Tecnologias
+## Tech Stack
 
-| Camada | Stack |
+| Layer | Technologies |
 |---|---|
-| Backend | Node.js · Express · TypeScript · `canvas` (geração de frames JPEG) |
-| Frontend | React · Vite · Tailwind CSS · shadcn/ui · TanStack Query |
-| Build | `tsx` · Rollup (via Vite) · esbuild |
+| **Backend** | Node.js · Express · TypeScript · `canvas` (JPEG frame generation) |
+| **Frontend** | React · Vite · Tailwind CSS · shadcn/ui · TanStack Query |
+| **Build** | `tsx` · Rollup (via Vite) · esbuild |
 
-## Pré-requisitos
+## Prerequisites
 
 - **Node.js ≥ 18**
 - **npm ≥ 9**
-- Dependências nativas do pacote `canvas`: `libcairo2-dev`, `libpango1.0-dev`, `libjpeg-dev`, `libgif-dev`
+- Native `canvas` dependencies: `libcairo2-dev`, `libpango1.0-dev`, `libjpeg-dev`, `libgif-dev`
 
 ### Ubuntu / Debian
 
@@ -36,7 +37,7 @@ sudo apt-get install -y libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev
 brew install pkg-config cairo pango libpng jpeg giflib librsvg
 ```
 
-## Instalação
+## Installation
 
 ```bash
 git clone https://github.com/suporterfid/rtsp-simulator.git
@@ -44,32 +45,42 @@ cd rtsp-simulator
 npm install
 ```
 
-## Desenvolvimento
+## Development
 
 ```bash
 npm run dev
 ```
 
-Inicia o servidor Express (backend) e o Vite (frontend) juntos na porta **5000**.
+Starts Express (backend) and Vite (frontend) on port **5000**.
 
-Acesse: [http://localhost:5000](http://localhost:5000)
+Access: [http://localhost:5000](http://localhost:5000)
 
-## Build de Produção
+## Production Build
 
 ```bash
 npm run build
 ```
 
-Gera o bundle estático em `dist/public/` e o servidor compilado em `dist/index.cjs`.
+Generates static bundle in `dist/public/` and compiled server in `dist/index.cjs`.
 
-## Execução em Produção
+## Production Run
 
 ```bash
 npm run build
 NODE_ENV=production node dist/index.cjs
 ```
 
-Servidor disponível em: [http://localhost:5000](http://localhost:5000)
+Server available at: [http://localhost:5000](http://localhost:5000)
+
+### Digifort-Compatible Port (8601)
+
+To emulate a Digifort server on the standard API port:
+
+```bash
+PORT=8601 NODE_ENV=production node dist/index.cjs
+```
+
+Or use a reverse proxy to forward port 8601 to 5000.
 
 ## Docker
 
@@ -99,32 +110,66 @@ docker run -p 5000:5000 rtsp-simulator
 
 ## Endpoints
 
-| Método | Rota | Descrição |
+### Native API
+
+| Method | Route | Description |
 |---|---|---|
-| `GET` | `/stream/:id` | Stream MJPEG contínuo (multipart/x-mixed-replace) |
-| `GET` | `/snapshot/:id` | Snapshot JPEG único |
-| `GET` | `/api/cameras` | Lista todas as câmeras e configurações |
-| `GET` | `/api/cameras/:id` | Detalhes de uma câmera |
-| `PATCH` | `/api/cameras/:id` | Atualiza configuração da câmera |
-| `GET` | `/api/stats` | Estatísticas de stream (frames, bytes, clientes ativos) |
+| `GET` | `/stream/:id` | Continuous MJPEG stream (multipart/x-mixed-replace) |
+| `GET` | `/snapshot/:id` | Single JPEG snapshot |
+| `GET` | `/api/cameras` | List all cameras and configurations |
+| `GET` | `/api/cameras/:id` | Get single camera details |
+| `PATCH` | `/api/cameras/:id` | Update camera configuration |
+| `GET` | `/api/stats` | Stream statistics (frames, bytes, active clients) |
 
-### IDs de câmera padrão
+### Digifort API Emulation
 
-`cam-01` … `cam-08`
+| Method | Route | Description | Status Codes |
+|---|---|---|---|
+| `GET` | `/Interface/Cameras/GetStatus?ResponseFormat=JSON` | All cameras in Digifort format (Name, RecordingFPS, UsedDiskSpace, ConfiguredToRecord) | 200, 400, 500 |
+| `GET` | `/Interface/Cameras/GetSnapshot?Camera={name}` | JPEG snapshot by camera name (case-sensitive) | 200, 400, 404, 503 |
 
-## Conectar no NVR/VMS
+**Default Camera IDs:** `cam-01` through `cam-08`
 
-### MJPEG direto (compatível com a maioria dos VMS)
+#### Digifort GetStatus Example
+
+```bash
+curl "http://localhost:5000/Interface/Cameras/GetStatus?ResponseFormat=JSON"
+```
+
+**Response:**
+```json
+{
+  "Response": {
+    "Data": {
+      "Cameras": [
+        { "Name": "Câmera 01 — Estacionamento", "RecordingFPS": 25, "UsedDiskSpace": 0, "ConfiguredToRecord": true },
+        { "Name": "Câmera 02 — Corredor A", "RecordingFPS": 0, "UsedDiskSpace": 0, "ConfiguredToRecord": false }
+      ]
+    }
+  }
+}
+```
+
+#### Digifort GetSnapshot Example
+
+```bash
+CAMERA_NAME="Câmera%2001%20%E2%80%94%20Estacionamento"
+curl "http://localhost:5000/Interface/Cameras/GetSnapshot?Camera=${CAMERA_NAME}" -o snapshot.jpg
+```
+
+## Connecting to NVR/VMS
+
+### Direct MJPEG (compatible with most VMS)
 
 ```
-http://<servidor>:5000/stream/cam-01
+http://<host>:5000/stream/cam-01
 ```
 
-### Blue Iris / Frigate (adicionar câmera genérica)
+### Blue Iris / Frigate (generic camera)
 
 ```
 URL: http://localhost:5000/stream/cam-01
-Tipo: MJPEG
+Type: MJPEG
 ```
 
 ### Frigate NVR (`frigate.yml`)
@@ -140,28 +185,58 @@ cameras:
             - record
 ```
 
-### Reencapsular como RTSP com FFmpeg
+### Re-encapsulate as RTSP with FFmpeg
 
 ```bash
 ffmpeg -re -i http://localhost:5000/stream/cam-01 \
   -c copy -f rtsp rtsp://localhost:8554/cam01
 ```
 
-## Modos de Falha
+### Digifort-Compatible Integration
 
-| Modo | Descrição | Caso de teste |
+The simulator now emulates the **Digifort VMS HTTP API**, allowing integration with:
+- **AlertaHub Vision Edge** (camera worker, edge API)
+- **AlertaHub Core** (NVR management, monitoring rounds)
+- Any client expecting Digifort API format
+
+#### AlertaHub Vision/Core Configuration
+
+```yaml
+nvr:
+  host: "localhost"
+  port: 5000  # or 8601 if behind reverse proxy
+  protocol: "RTSP"
+  nvrBrand: "Digifort"
+  username: "admin"  # any value, ignored by simulator
+  password: "admin"  # any value, ignored by simulator
+```
+
+#### Camera Discovery Flow
+
+1. Call `GET /Interface/Cameras/GetStatus?ResponseFormat=JSON` to discover cameras
+2. Parse `Response.Data.Cameras[].Name` for camera list
+3. Construct RTSP URLs: `rtsp://user:pass@host:554/interface/cameras/media?camera={Name}&Profile=Visualization`
+4. Construct snapshot URLs: `http://host:5000/Interface/Cameras/GetSnapshot?Camera={Name}`
+
+For complete Digifort API documentation, see:
+- [`docs/specs/digifort/SPEC-DIGIFORT-API-EMULATION.md`](docs/specs/digifort/SPEC-DIGIFORT-API-EMULATION.md) — Full endpoint specification
+- [`docs/specs/digifort/IMPLEMENTATION-PLAN-SPEC-DIGIFORT-API-EMULATION.md`](docs/specs/digifort/IMPLEMENTATION-PLAN-SPEC-DIGIFORT-API-EMULATION.md) — Implementation details
+
+## Fault Modes
+
+| Mode | Description | Test Case |
 |---|---|---|
-| `normal` | Stream limpo | Operação normal |
-| `freeze` | Frame congela por 2–7 s aleatoriamente | Detecção de stream estático no VMS |
-| `green_screen` | Tela verde (`#00FF00`) | Detecção de perda de sinal de câmera |
-| `noise` | Interferência visual tipo analógico | Análise de qualidade de vídeo |
-| `black` | Tela preta total | Câmera com lente tampada / sem energia |
-| `pixelate` | Blocos pixelados | Degradação de bitrate / perda de pacotes |
-| `disconnect` | Stream cai (sem frames / HTTP 503) | Timeout de reconexão no NVR |
+| `normal` | Clean stream | Normal operation |
+| `freeze` | Frame freezes for 2–7 seconds randomly | Detect static stream in VMS |
+| `green_screen` | Green screen (`#00FF00`) | Detect camera signal loss |
+| `noise` | Analog-style visual interference | Video quality analysis |
+| `black` | Total black screen | Lens cap / power loss |
+| `pixelate` | Pixelated blocks | Bitrate degradation / packet loss |
+| `disconnect` | Stream drops (no frames / HTTP 503) | NVR reconnection timeout |
 
-A **probabilidade de falha** (0–100%) define com que frequência o modo é ativado. A falha dura alguns segundos e o stream volta ao normal automaticamente.
+The **fault probability** (0–100%) defines how frequently the fault is triggered. Faults last a few seconds and stream automatically recovers.
 
-## Estrutura do Projeto
+## Project Structure
 
 ```
 rtsp-simulator/
@@ -171,28 +246,43 @@ rtsp-simulator/
 │       ├── App.tsx
 │       ├── index.css
 │       ├── pages/
-│       │   ├── Dashboard.tsx     # Monitor de câmeras
-│       │   └── CameraConfig.tsx  # Configuração de falhas
+│       │   ├── Dashboard.tsx     # Camera monitor
+│       │   └── CameraConfig.tsx  # Fault injection config
 │       └── components/
 ├── server/                 # Backend Express
 │   ├── index.ts            # Entry point
-│   ├── routes.ts           # Rotas MJPEG + API REST
-│   ├── storage.ts          # Estado em memória
-│   └── frameGenerator.ts   # Geração de frames com canvas
+│   ├── routes.ts           # MJPEG streams + REST API + Digifort endpoints
+│   ├── storage.ts          # In-memory state
+│   └── frameGenerator.ts   # Canvas-based JPEG frame generation
 ├── shared/
-│   └── schema.ts           # Tipos compartilhados (Camera, FaultMode, StreamStats)
+│   └── schema.ts           # Shared types (Camera, FaultMode, StreamStats)
+├── docs/
+│   └── specs/
+│       └── digifort/       # Digifort API specifications & implementation guide
 ├── script/
-│   └── build.ts            # Script de build
+│   └── build.ts            # Build script
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
 └── tailwind.config.ts
 ```
 
-## Licença
+## Key Features
+
+- ✅ **8 Virtual Cameras** with animated scenes (parking lot, corridor, entrance, server room, warehouse, outdoor)
+- ✅ **Configurable Faults** (freeze, green screen, noise, black screen, pixelation, disconnection)
+- ✅ **HTTP/MJPEG Streaming** for direct NVR integration
+- ✅ **REST API** for camera configuration and monitoring
+- ✅ **Digifort API Emulation** (GetStatus, GetSnapshot) for AlertaHub and Digifort clients
+- ✅ **Web Dashboard** to monitor and control cameras in real-time
+- ✅ **Docker Support** for containerized deployment
+- ✅ **TypeScript** for type safety
+- ✅ **Zero Hardware Required** — fully simulated cameras with realistic scenarios
+
+## License
 
 MIT
 
 ---
 
-Criado com [Perplexity Computer](https://www.perplexity.ai/computer)
+Built with [Perplexity Computer](https://www.perplexity.ai/computer)
